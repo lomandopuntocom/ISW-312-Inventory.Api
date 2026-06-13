@@ -15,7 +15,7 @@ services:
       - ./database:/docker-entrypoint-initdb.d
 
   inventory-api:
-    build: ./Inventory.Api
+    build: ./ISW-312-Inventory.Api
     container_name: inventory-api-srv
     ports:
       - "5143:8080"
@@ -26,7 +26,7 @@ services:
       - postgres-db
 
   purchase-api:
-    build: ./Purchases.Api
+    build: ./ISW-312-Purchases.Api
     container_name: purchase-api-srv
     ports:
       - "5085:8080"
@@ -38,7 +38,7 @@ services:
       - postgres-db
 
   sale-api:
-    build: ./Sales.Api
+    build: ./ISW-312-Sales.Api
     container_name: sale-api-srv
     ports:
       - "5074:8080"
