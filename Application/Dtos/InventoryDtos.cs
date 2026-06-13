@@ -46,3 +46,20 @@ public sealed record StockMutationRequest(string ProductCen, string? WarehouseCe
 public sealed record StockAdjustmentRequest(string ProductCen, string? WarehouseCen, decimal Quantity, string Reason);
 public sealed record CreateDocumentRequest(string? LocationCen, string? WarehouseCen, string OperationType, string? Reference, string? Notes, IReadOnlyList<CreateDocumentItemRequest> Items);
 public sealed record CreateDocumentItemRequest(string ProductCen, decimal Quantity, string? Notes);
+
+public sealed record CreateWarehouseContractRequest(string Name, bool IsActive);
+public sealed record WarehouseContractDto(string WarehouseCen, string Name, bool IsActive);
+public sealed record UpdateWarehouseContractRequest(string Name, bool IsActive);
+public sealed record CreateCompanyContractRequest(string Name, bool IsActive);
+public sealed record CompanyContractDto(string CompanyCen, string Name, bool IsActive);
+public sealed record UpdateCompanyContractRequest(string Name, bool IsActive);
+public sealed record InventoryDocumentContractDto(
+    string DocumentCen,
+    string DocumentType,
+    string Status,
+    string Title,
+    DateTime CreatedAt,
+    int TotalItems,
+    IReadOnlyList<string> GeneratedMovementCens
+);
+

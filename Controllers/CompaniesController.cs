@@ -1,4 +1,5 @@
 using Inventory.Api.Application.Dtos;
+using Inventory.Api.Domain.Entities;
 using Inventory.Api.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -28,4 +29,42 @@ public sealed class CompaniesController(InventoryDbContext db) : InventoryContro
             ? NotFound()
             : Ok(new CompanyDto(company.Cen.ToString(), company.Name, company.Nit, company.Active));
     }
+
+    [HttpPost]
+    public async Task<IActionResult> CreateCompany(CreateCompanyContractRequest request)
+    {
+        var company = new Company
+        {
+            Name = request.Name,
+            Active = request.IsActive,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+
+        Db.Companies.Add(company);
+        await Db.SaveChangesAsync();
+
+        return CreatedAtAction(
+            nameof(GetByCen),
+            new { companyCen = company.Cen.ToString() },
+            new CompanyContractDto(company.Cen.ToString(), company.Name, company.Active));
+    }
+
+    [HttpPut("{companyCen}")]
+    public async Task<IActionResult> UpdateCompany(string companyCen, UpdateCompanyContractRequest request)
+    {
+        if (!TryParseCen(companyCen, out var cen)) return NotFound();
+
+        var company = await Db.Companies.FirstOrDefaultAsync(x => x.Cen == cen);
+        if (company is null) return NotFound();
+
+        company.Name = request.Name;
+        company.Active = request.IsActive;
+        company.UpdatedAt = DateTime.UtcNow;
+
+        await Db.SaveChangesAsync();
+
+        return Ok(new CompanyContractDto(company.Cen.ToString(), company.Name, company.Active));
+    }
 }
+

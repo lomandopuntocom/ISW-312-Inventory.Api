@@ -148,4 +148,67 @@ public sealed class CatalogController(InventoryDbContext db) : InventoryControll
 
         return Ok(items);
     }
+
+    [HttpPost("warehouses")]
+    public async Task<IActionResult> CreateWarehouse(string companyCen, CreateWarehouseContractRequest request)
+    {
+        var company = await FindCompanyAsync(companyCen);
+        if (company is null) return NotFound();
+
+        var location = await Db.Locations.FirstOrDefaultAsync(x => x.CompanyCen == company.Cen && x.Active);
+        if (location is null)
+        {
+            var locationCount = await Db.Locations.CountAsync(x => x.CompanyCen == company.Cen);
+            location = new Location
+            {
+                CompanyId = company.Id,
+                CompanyCen = company.Cen,
+                Code = $"LOC-{(locationCount + 1):D5}",
+                Name = "Principal",
+                Active = true
+            };
+            Db.Locations.Add(location);
+            await Db.SaveChangesAsync();
+        }
+
+        var warehouseCode = await GenerateNextCodeAsync(company.Cen, "ALM", () => Db.Warehouses.CountAsync(x => x.CompanyCen == company.Cen));
+
+        var warehouse = new Warehouse
+        {
+            CompanyId = company.Id,
+            CompanyCen = company.Cen,
+            LocationId = location.Id,
+            LocationCen = location.Cen,
+            Code = warehouseCode,
+            Name = request.Name,
+            Active = request.IsActive
+        };
+
+        Db.Warehouses.Add(warehouse);
+        await Db.SaveChangesAsync();
+
+        return CreatedAtAction(
+            nameof(GetWarehouses),
+            new { companyCen },
+            new WarehouseContractDto(warehouse.Cen.ToString(), warehouse.Name, warehouse.Active));
+    }
+
+    [HttpPut("warehouses/{warehouseCen}")]
+    public async Task<IActionResult> UpdateWarehouse(string companyCen, string warehouseCen, UpdateWarehouseContractRequest request)
+    {
+        var company = await FindCompanyAsync(companyCen);
+        if (company is null || !TryParseCen(warehouseCen, out var whCen)) return NotFound();
+
+        var warehouse = await Db.Warehouses.FirstOrDefaultAsync(x => x.CompanyCen == company.Cen && x.Cen == whCen);
+        if (warehouse is null) return NotFound();
+
+        warehouse.Name = request.Name;
+        warehouse.Active = request.IsActive;
+        warehouse.UpdatedAt = DateTime.UtcNow;
+
+        await Db.SaveChangesAsync();
+
+        return Ok(new WarehouseContractDto(warehouse.Cen.ToString(), warehouse.Name, warehouse.Active));
+    }
 }
+

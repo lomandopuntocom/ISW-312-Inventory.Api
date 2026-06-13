@@ -70,4 +70,34 @@ public sealed class DocumentsController(InventoryDbContext db) : InventoryContro
 
         return Ok(new { cen = document.Cen, document.DocumentNumber, document.Status });
     }
+
+    [HttpGet("{documentCen}")]
+    public async Task<IActionResult> GetDocumentByCen(string companyCen, string documentCen)
+    {
+        var company = await FindCompanyAsync(companyCen);
+        if (company is null || !TryParseCen(documentCen, out var docCen)) return NotFound();
+
+        var doc = await Db.OperationDocuments
+            .Include(x => x.Items)
+            .FirstOrDefaultAsync(x => x.CompanyCen == company.Cen && x.Cen == docCen);
+
+        if (doc is null) return NotFound();
+
+        var movementCens = await Db.Movements
+            .Where(x => x.CompanyCen == company.Cen && (x.Reference == doc.DocumentNumber || x.Reference == doc.Cen.ToString()))
+            .Select(x => x.Cen.ToString())
+            .ToListAsync();
+
+        var dto = new InventoryDocumentContractDto(
+            doc.Cen.ToString(),
+            doc.OperationType,
+            doc.Status,
+            doc.DocumentNumber,
+            doc.CreatedAt,
+            doc.Items.Count,
+            movementCens);
+
+        return Ok(dto);
+    }
 }
+
