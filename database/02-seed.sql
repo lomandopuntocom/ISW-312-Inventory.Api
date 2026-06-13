@@ -1,23 +1,12 @@
 -- ============================================================
--- SEED DATA - ISW-312-PROJ1
--- Base de datos vacía (o sin datos demo). Ejecutar en pgAdmin.
---
--- CEN: no se insertan UUID fijos. Cada fila obtiene cen vía DEFAULT
---       (gen_random_uuid). Las columnas *_cen se copian del padre en el INSERT.
---
--- Orden recomendado:
---   1) Migraciones EF de Inventory, Sales, Purchases
---   2) Este archivo (aplica DEFAULT en cen y luego inserta los datos)
---
--- Si falla a mitad: ROLLBACK y vuelve a ejecutar todo el script.
--- Para empresa ya existente: database/seed-bootstrap-by-cen.sql
+-- SCRIPT DE POBLACIÓN DE DATOS SEMILLA (C# / .NET)
 -- ============================================================
 
 BEGIN;
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
--- EF crea cen NOT NULL sin DEFAULT: sin esto, omitir cen en INSERT falla con 23502.
+-- 1. Forzar generación de default para UUIDs en cen si no estuvieran presentes
 ALTER TABLE inventory.companies ALTER COLUMN cen SET DEFAULT gen_random_uuid();
 ALTER TABLE inventory.categories ALTER COLUMN cen SET DEFAULT gen_random_uuid();
 ALTER TABLE inventory.units_measure ALTER COLUMN cen SET DEFAULT gen_random_uuid();
@@ -44,23 +33,11 @@ ALTER TABLE sales.tax_configuration ALTER COLUMN cen SET DEFAULT gen_random_uuid
 ALTER TABLE purchases.orders ALTER COLUMN cen SET DEFAULT gen_random_uuid();
 ALTER TABLE purchases.order_items ALTER COLUMN cen SET DEFAULT gen_random_uuid();
 
--- Reparar filas de intentos fallidos (cen NULL)
-UPDATE inventory.companies SET cen = gen_random_uuid() WHERE cen IS NULL;
-UPDATE inventory.categories SET cen = gen_random_uuid() WHERE cen IS NULL;
-UPDATE inventory.units_measure SET cen = gen_random_uuid() WHERE cen IS NULL;
-UPDATE inventory.products SET cen = gen_random_uuid() WHERE cen IS NULL;
-UPDATE inventory.locations SET cen = gen_random_uuid() WHERE cen IS NULL;
-UPDATE inventory.warehouses SET cen = gen_random_uuid() WHERE cen IS NULL;
-UPDATE inventory.stock SET cen = gen_random_uuid() WHERE cen IS NULL;
-UPDATE inventory.movement_types SET cen = gen_random_uuid() WHERE cen IS NULL;
-UPDATE inventory.movements SET cen = gen_random_uuid() WHERE cen IS NULL;
-UPDATE inventory.operation_documents SET cen = gen_random_uuid() WHERE cen IS NULL;
-UPDATE inventory.operation_document_items SET cen = gen_random_uuid() WHERE cen IS NULL;
-
 -- ============================================================
--- SCHEMA: inventory
+-- DATOS: inventory
 -- ============================================================
 
+-- Empresa Demo (El Sabor)
 INSERT INTO inventory.companies (name, nit, phone, email, address, city, country, active, created_at, updated_at)
 SELECT
   'Restaurante El Sabor', '20123456789', '01-4445566', 'info@elsabor.pe',
@@ -69,6 +46,7 @@ WHERE NOT EXISTS (
   SELECT 1 FROM inventory.companies WHERE nit = '20123456789'
 );
 
+-- Unidades de Medida
 INSERT INTO inventory.units_measure (code, name, abbreviation, active, created_at)
 SELECT v.code, v.name, v.abbreviation, true, NOW()
 FROM (VALUES
@@ -81,6 +59,7 @@ WHERE NOT EXISTS (
   SELECT 1 FROM inventory.units_measure u WHERE u.code = v.code
 );
 
+-- Categorías
 INSERT INTO inventory.categories (company_id, company_cen, code, name, description, active, created_at, updated_at)
 SELECT c.id, c.cen, v.code, v.name, v.description, true, NOW(), NOW()
 FROM inventory.companies c
@@ -96,6 +75,7 @@ WHERE c.nit = '20123456789'
     WHERE cat.company_cen = c.cen AND cat.code = v.code
   );
 
+-- Productos
 INSERT INTO inventory.products (
   company_id, company_cen, code, sku, name, description,
   category_id, category_cen, unit_measure_id, unit_measure_cen,
@@ -124,6 +104,7 @@ WHERE c.nit = '20123456789'
     WHERE p.company_cen = c.cen AND p.code = v.code
   );
 
+-- Local Principal
 INSERT INTO inventory.locations (company_id, company_cen, code, name, address, phone, active, created_at, updated_at)
 SELECT c.id, c.cen, 'LOC-00001', 'Local Principal', 'Av. Larco 123', '01-4445566', true, NOW(), NOW()
 FROM inventory.companies c
@@ -132,6 +113,7 @@ WHERE c.nit = '20123456789'
     SELECT 1 FROM inventory.locations l WHERE l.company_id = c.id AND l.code = 'LOC-00001'
   );
 
+-- Almacén Principal
 INSERT INTO inventory.warehouses (company_id, company_cen, location_id, location_cen, code, name, description, active, created_at, updated_at)
 SELECT c.id, c.cen, l.id, l.cen, 'ALM-00001', 'Almacen Principal', 'Almacen central', true, NOW(), NOW()
 FROM inventory.companies c
@@ -141,6 +123,7 @@ WHERE c.nit = '20123456789'
     SELECT 1 FROM inventory.warehouses w WHERE w.company_id = c.id AND w.code = 'ALM-00001'
   );
 
+-- Stock Inicial
 INSERT INTO inventory.stock (
   company_id, company_cen, location_id, location_cen,
   warehouse_id, warehouse_cen, product_id, product_cen,
@@ -163,6 +146,7 @@ WHERE c.nit = '20123456789'
     WHERE s.product_cen = p.cen AND s.warehouse_cen = w.cen
   );
 
+-- Tipos de Movimientos de Inventario
 INSERT INTO inventory.movement_types (code, name, "Description", movement_direction, active, created_at)
 SELECT v.code, v.name, v.description, v.direction, true, NOW()
 FROM (VALUES
@@ -174,6 +158,7 @@ WHERE NOT EXISTS (
   SELECT 1 FROM inventory.movement_types mt WHERE mt.code = v.code
 );
 
+-- Documentos de Operación inicial
 INSERT INTO inventory.operation_documents (
   company_id, company_cen, location_id, location_cen, warehouse_id, warehouse_cen,
   document_number, operation_type, status, reference, notes, created_at, confirmed_at, updated_at
@@ -209,7 +194,7 @@ WHERE c.nit = '20123456789'
   );
 
 -- ============================================================
--- SCHEMA: sales
+-- DATOS: sales
 -- ============================================================
 
 INSERT INTO sales."Company" ("Id", "Cen", "Name")
@@ -233,6 +218,7 @@ WHERE c.nit = '20123456789'
     SELECT 1 FROM sales.tax_configuration t WHERE t.company_cen = c.cen
   );
 
+-- Vendedores / Meseros
 INSERT INTO sales."Vendor" ("CompanyId", "CompanyCen", "Name", "Email", "Phone", "IsWaiter", "Active", "CreatedAt", "UpdatedAt")
 SELECT c.id, c.cen, v.name, v.email, v.phone, v.is_waiter, true, NOW(), NOW()
 FROM inventory.companies c
@@ -247,6 +233,7 @@ WHERE c.nit = '20123456789'
     WHERE sv."CompanyCen" = c.cen AND sv."Email" = v.email
   );
 
+-- Estaciones KDS
 INSERT INTO sales.command_stations (company_id, company_cen, code, name, station_type, description, active, created_at, updated_at)
 SELECT c.id, c.cen, v.code, v.name, v.station_type, v.description, true, NOW(), NOW()
 FROM inventory.companies c
@@ -260,6 +247,7 @@ WHERE c.nit = '20123456789'
     WHERE cs.company_cen = c.cen AND cs.code = v.code
   );
 
+-- Tickets de Prueba
 INSERT INTO sales."Ticket" (
   "CompanyId", "CompanyCen", "LocationId", "LocationCen",
   "TicketNumber", "VendorId", "VendorCen", "TableCode", "Status"
@@ -281,6 +269,7 @@ WHERE c.nit = '20123456789'
     WHERE t."CompanyCen" = c.cen AND t."TicketNumber" = v.ticket_number
   );
 
+-- Items de los Tickets
 INSERT INTO sales."TicketItem" (
   "TicketId", "TicketCen", "ProductId", "ProductCen",
   "Quantity", "UnitPrice", "Status", "Notes"
@@ -306,6 +295,7 @@ WHERE c.nit = '20123456789'
     WHERE ti."TicketCen" = t."Cen" AND ti."ProductCen" = p.cen
   );
 
+-- Pagos
 INSERT INTO sales."Payment" (
   "TicketId", "TicketCen", "PaymentMethod", "Amount", "Reference", "PaidBy", "CreatedAt", "UpdatedAt"
 )
@@ -318,6 +308,7 @@ WHERE c.nit = '20123456789'
     SELECT 1 FROM sales."Payment" p WHERE p."TicketCen" = t."Cen"
   );
 
+-- Comandas KDS
 INSERT INTO sales.commands (
   company_id, company_cen, location_id, location_cen,
   ticket_id, ticket_cen, station_id, station_cen,
@@ -366,20 +357,10 @@ WHERE c.nit = '20123456789'
   );
 
 -- ============================================================
--- SCHEMA: purchases
+-- DATOS: purchases
 -- ============================================================
 
-CREATE TABLE IF NOT EXISTS purchases.suppliers (
-  id          serial PRIMARY KEY,
-  company_id  integer NOT NULL,
-  code        text NOT NULL,
-  name        text NOT NULL,
-  active      boolean NOT NULL DEFAULT true,
-  created_at  timestamptz NOT NULL DEFAULT now(),
-  updated_at  timestamptz NOT NULL DEFAULT now(),
-  CONSTRAINT uq_suppliers_company_code UNIQUE (company_id, code)
-);
-
+-- Proveedores
 INSERT INTO purchases.suppliers (company_id, code, name, active, created_at, updated_at)
 SELECT c.id, v.code, v.name, true, NOW(), NOW()
 FROM inventory.companies c
@@ -393,6 +374,7 @@ WHERE c.nit = '20123456789'
     WHERE s.company_id = c.id AND s.code = v.code
   );
 
+-- Órdenes de Compra
 INSERT INTO purchases.orders (company_id, company_cen, supplier, supplier_cen, date, status, created_at, updated_at)
 SELECT c.id, c.cen, s.name, NULL, NOW(), v.status, NOW(), NOW()
 FROM inventory.companies c
@@ -407,6 +389,7 @@ WHERE c.nit = '20123456789'
     WHERE o.company_cen = c.cen AND o.supplier = s.name AND o.status = v.status
   );
 
+-- Detalle de Órdenes de Compra
 INSERT INTO purchases.order_items (order_id, order_cen, product_id, product_cen, quantity, created_at)
 SELECT ord."Id", ord.cen, p.id, p.cen, v.quantity, NOW()
 FROM inventory.companies c
@@ -425,10 +408,5 @@ WHERE c.nit = '20123456789'
     SELECT 1 FROM purchases.order_items oi
     WHERE oi.order_cen = ord.cen AND oi.product_cen = p.cen
   );
-
--- CEN de la empresa demo (para localStorage companyCen en el front)
-SELECT id, cen, name, nit
-FROM inventory.companies
-WHERE nit = '20123456789';
 
 COMMIT;
