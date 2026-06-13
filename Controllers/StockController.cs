@@ -8,7 +8,10 @@ namespace Inventory.Api.Controllers;
 
 [ApiController]
 [Route("api/inventory/companies/{companyCen}/stock")]
-public sealed class StockController(InventoryDbContext db) : InventoryControllerBase(db)
+public sealed class StockController(
+    InventoryDbContext db,
+    Inventory.Api.Infrastructure.RestockEventBroadcaster broadcaster
+) : InventoryControllerBase(db)
 {
     [HttpGet]
     public async Task<IActionResult> GetStock(string companyCen, [FromQuery] string? productCen, [FromQuery] string? warehouseCen)
@@ -118,6 +121,21 @@ public sealed class StockController(InventoryDbContext db) : InventoryController
 
         await Db.SaveChangesAsync();
         var product = await Db.Products.FirstOrDefaultAsync(x => x.Cen == stock.ProductCen);
+
+        if (delta > 0)
+        {
+            broadcaster.Broadcast(new Inventory.Api.Domain.Entities.RestockEvent(
+                stock.CompanyCen.ToString(),
+                stock.ProductCen.ToString(),
+                product?.Code ?? stock.ProductCen.ToString(),
+                product?.Name ?? "Producto",
+                Math.Abs(delta),
+                stock.Quantity,
+                stock.WarehouseCen.ToString(),
+                DateTime.UtcNow
+            ));
+        }
+
         return Ok(new StockDto(
             stock.ProductCen.ToString(),
             product?.Code ?? stock.ProductCen.ToString(),

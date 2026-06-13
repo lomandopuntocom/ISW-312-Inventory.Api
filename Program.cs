@@ -16,16 +16,23 @@ if (File.Exists(envPath))
 
 var builder = WebApplication.CreateBuilder(args);
 
-var dbHost = Environment.GetEnvironmentVariable("DATABASE_HOST") ?? "localhost";
-var dbPort = Environment.GetEnvironmentVariable("DATABASE_PORT") ?? "5432";
-var dbName = Environment.GetEnvironmentVariable("DATABASE_NAME") ?? throw new InvalidOperationException("DATABASE_NAME not configured");
-var dbUser = Environment.GetEnvironmentVariable("DATABASE_USER") ?? throw new InvalidOperationException("DATABASE_USER not configured");
-var dbPassword = Environment.GetEnvironmentVariable("DATABASE_PASSWORD") ?? throw new InvalidOperationException("DATABASE_PASSWORD not configured");
+var connectionString = Environment.GetEnvironmentVariable("DB_CONNECTION_STRING");
+if (string.IsNullOrEmpty(connectionString))
+{
+    var dbHost = Environment.GetEnvironmentVariable("DATABASE_HOST") ?? "localhost";
+    var dbPort = Environment.GetEnvironmentVariable("DATABASE_PORT") ?? "5432";
+    var dbName = Environment.GetEnvironmentVariable("DATABASE_NAME") ?? throw new InvalidOperationException("DATABASE_NAME not configured");
+    var dbUser = Environment.GetEnvironmentVariable("DATABASE_USER") ?? throw new InvalidOperationException("DATABASE_USER not configured");
+    var dbPassword = Environment.GetEnvironmentVariable("DATABASE_PASSWORD") ?? throw new InvalidOperationException("DATABASE_PASSWORD not configured");
 
-var connectionString = $"Host={dbHost};Port={dbPort};Database={dbName};Username={dbUser};Password={dbPassword}";
+    connectionString = $"Host={dbHost};Port={dbPort};Database={dbName};Username={dbUser};Password={dbPassword}";
+}
 
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
+builder.Services.AddExceptionHandler<Inventory.Api.Infrastructure.GlobalExceptionHandler>();
+builder.Services.AddProblemDetails();
+builder.Services.AddSingleton<Inventory.Api.Infrastructure.RestockEventBroadcaster>();
 builder.Services.AddDbContext<InventoryDbContext>(options =>
     options.UseNpgsql(connectionString, npgsql =>
         npgsql.MigrationsHistoryTable("__EFMigrationsHistory", "inventory")));
@@ -57,5 +64,6 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseCors("AllowFrontend");
+app.UseExceptionHandler();
 app.MapControllers();
 app.Run();
