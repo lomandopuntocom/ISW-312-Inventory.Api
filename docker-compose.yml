@@ -1,13 +1,11 @@
-version: '3.8'
-
 services:
   postgres-db:
     image: postgres:15-alpine
-    container_name: sistemagestion-db
+    container_name: fastinventory-db
     environment:
       POSTGRES_USER: ${DB_USER:-admin}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-secret_password}
-      POSTGRES_DB: ${DB_NAME:-sistemagestion}
+      POSTGRES_DB: ${DB_NAME}
     ports:
       - "5432:5432"
     volumes:
@@ -26,7 +24,7 @@ services:
       - postgres-db
 
   purchase-api:
-    build: ./ISW-312-Purchases.Api
+    build: ./ISW-312-Purchase.Api
     container_name: purchase-api-srv
     ports:
       - "5085:8080"
@@ -38,7 +36,7 @@ services:
       - postgres-db
 
   sale-api:
-    build: ./ISW-312-Sales.Api
+    build: ./ISW-312-Sale.Api
     container_name: sale-api-srv
     ports:
       - "5074:8080"
@@ -48,6 +46,21 @@ services:
       - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT}
     depends_on:
       - postgres-db
+
+  web-app:
+    build:
+      context: ./ISW-312-frontend
+      args:
+        - VITE_INVENTORY_API_URL=${VITE_INVENTORY_API_URL}
+        - VITE_PURCHASES_API_URL=${VITE_PURCHASES_API_URL}
+        - VITE_SALES_API_URL=${VITE_SALES_API_URL}
+    container_name: web-page-srv
+    ports:
+      - "3000:80"
+    depends_on:
+      - inventory-api
+      - purchase-api
+      - sale-api
 
 volumes:
   pgdata:
