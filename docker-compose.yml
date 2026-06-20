@@ -24,7 +24,7 @@ services:
       - postgres-db
 
   purchase-api:
-    build: ./ISW-312-Purchase.Api
+    build: ./ISW-312-Purchases.Api
     container_name: purchase-api-srv
     ports:
       - "5085:8080"
@@ -36,7 +36,7 @@ services:
       - postgres-db
 
   sale-api:
-    build: ./ISW-312-Sale.Api
+    build: ./ISW-312-Sales.Api
     container_name: sale-api-srv
     ports:
       - "5074:8080"
